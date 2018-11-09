@@ -57,27 +57,15 @@ let string_to_key s =
 
 let key_to_string l =
   let rec aux n = function
-#if OCAML_VERSION >= "4.02"
     | [] -> Bytes.create n
-#else
-    | [] -> String.create n
-#endif
     | c::r ->
         let s = aux (n+1) r in
-#if OCAML_VERSION >= "4.02"
   Bytes.set s n
-#else
-  s.[n] <-
-#endif
     (if c = dot then '.' else c);
         s
   in
   let s = aux 0 l in
-#if OCAML_VERSION >= "4.02"
     Bytes.to_string s
-#else
-    s
-#endif
 
 
 let modpath_to_key ?(enddot=true) path =
@@ -99,11 +87,8 @@ let parent_type id =
   match id.IndexTypes.kind with
   | Field parent | Variant parent | Method parent -> Some parent
   | Type | Value | Exception | Module | ModuleType | Class
-#if OCAML_VERSION >= "4.02"
   | OpenType
-#endif
   | ClassType | Keyword -> None
-
 
 let unique_subdirs ?(skip = fun _ -> false) dir_list =
   let rec subdirs acc path =
@@ -114,7 +99,7 @@ let unique_subdirs ?(skip = fun _ -> false) dir_list =
         if try Sys.is_directory path with Sys_error _ -> false
         then subdirs acc path else acc)
       (path::acc)
-      (Sys.readdir path)
+      (try Sys.readdir path with Sys_error _ -> [||])
   in
   let remove_dups l =
     let rec aux = function
@@ -126,12 +111,20 @@ let unique_subdirs ?(skip = fun _ -> false) dir_list =
   in
   remove_dups (List.fold_left subdirs [] dir_list)
 
+let read_all_lines path =
+  let ic = open_in path in
+  let rec loop acc =
+    match input_line ic with
+    | l -> loop (l :: acc)
+    | exception End_of_file -> close_in ic; acc
+  in
+  loop []
 
 (* - Project root finding - *)
 
 let build_roots = (* by increasing order of priority *)
   [ "_darcs"; ".hg"; ".git";
-    "jengaroot.ml"; "omakeroot"; "_build"; "_obuild" ]
+    "jengaroot.ml"; "omakeroot"; "_build"; "_obuild"; ".ocp-index" ]
 
 let find_build_dir path =
   let ( / ) = Filename.concat in
@@ -147,6 +140,10 @@ let find_build_dir path =
         | Some roots -> roots, Some f)
       (build_roots, None) files
   in
+  begin match root with
+  | None -> ()
+  | Some dir -> debug "Found build: %s\n%!" dir
+  end;
   match root with
   | None -> None
   | Some ("_obuild" | "_build" as dir) -> Some (path / dir)

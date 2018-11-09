@@ -64,9 +64,7 @@ module IndexFormat = struct
   let color =
     let f kind fstr fmt =
       let colorcode = match kind with
-#if OCAML_VERSION >= "4.02"
         | OpenType
-#endif
         | Type -> "\027[36m"
         | Value -> "\027[1m"
         | Exception -> "\027[33m"
@@ -95,9 +93,7 @@ module IndexFormat = struct
 
   let kind ?(colorise = no_color) fmt id =
     match id.kind with
-#if OCAML_VERSION >= "4.02"
     | OpenType -> Format.pp_print_string fmt "opentype"
-#endif
     | Type -> Format.pp_print_string fmt "type"
     | Value -> Format.pp_print_string fmt "val"
     | Exception -> Format.pp_print_string fmt "exception"
@@ -172,17 +168,9 @@ module IndexFormat = struct
     | Osig_class (_,_,_,ctyp,_)
     | Osig_class_type (_,_,_,ctyp,_) ->
         !Oprint.out_class_type fmt ctyp
-#if OCAML_VERSION >= "4.02"
     | Osig_typext ({ oext_args = [] }, _) ->
-#else
-    | Osig_exception (_,[]) ->
-#endif
         Format.pp_print_char fmt '-'
-#if OCAML_VERSION >= "4.02"
     | Osig_typext ({ oext_args }, _) ->
-#else
-    | Osig_exception (_,oext_args) ->
-#endif
         list ~paren:true
           !Oprint.out_type
           (fun fmt () ->
@@ -192,24 +180,12 @@ module IndexFormat = struct
     | Osig_modtype (_,mtyp)
     | Osig_module (_,mtyp,_) ->
         !Oprint.out_module_type fmt mtyp
-#if OCAML_VERSION >= "4.03"
     | Osig_type ({ otype_type },_) ->
         tydecl fmt otype_type
     | Osig_value {oval_type} ->
         !Oprint.out_type fmt oval_type
     | Osig_ellipsis ->
         Format.fprintf fmt "..."
-#elif OCAML_VERSION >= "4.02"
-    | Osig_type ({ otype_type },_) ->
-        tydecl fmt otype_type
-    | Osig_value (_,ty,_) ->
-        !Oprint.out_type fmt ty
-#else
-    | Osig_type ((_,_,ty,_,_),_) ->
-        tydecl fmt ty
-    | Osig_value (_,ty,_) ->
-        !Oprint.out_type fmt ty
-#endif
 
   let ty ?(colorise = no_color) fmt id =
     option_iter id.ty
@@ -238,7 +214,8 @@ module IndexFormat = struct
       let fname = match root with
         | Some r when Filename.is_relative pos.Lexing.pos_fname ->
             Filename.concat r pos.Lexing.pos_fname
-        | _ -> pos.Lexing.pos_fname
+        | _ ->
+            pos.Lexing.pos_fname
       in
       Format.fprintf fmt "@[<h>%s:%d:%d@]"
         fname pos.Lexing.pos_lnum (pos.Lexing.pos_cnum - pos.Lexing.pos_bol)

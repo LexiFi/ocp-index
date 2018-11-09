@@ -24,23 +24,14 @@ let mktype name ?(params=[]) ?(def=Otyp_abstract) doc = {
   kind = Type;
   name = name;
   ty = Some (Osig_type (
-#if OCAML_VERSION >= "4.02"
       { otype_name    = name;
         otype_params  = List.map (fun v -> v,(true,true)) params;
         otype_type    = def;
         otype_private = Asttypes.Public;
-  #if OCAML_VERSION >= "4.03"
+        otype_cstrs   = [];
         otype_immediate = false;
-    #if OCAML_VERSION >= "4.04"
-        otype_unboxed = false;
-    #endif
-  #endif
-        otype_cstrs   = [] }, Orec_not));
-#else
-      (name,List.map (fun v -> v,(true,true)) params,def,Asttypes.Public,[]),
-      Orec_not));
-#endif
-loc_sig = Lazy.from_val Location.none;
+        otype_unboxed = false }, Orec_not));
+  loc_sig = Lazy.from_val Location.none;
   loc_impl = Lazy.from_val Location.none;
   doc = Lazy.from_val (Some doc);
   file = Cmi "*built-in*";
@@ -51,27 +42,15 @@ let mkvariant name parent params = {
   orig_path = [];
   kind = Variant parent;
   name = name;
-#if OCAML_VERSION >= "4.02"
   ty = Some (Osig_type (
       { otype_name    = "";
         otype_params  = [];
         otype_type    = (match params with [] -> Otyp_sum []
                                          | l  -> Otyp_tuple l);
         otype_private = Asttypes.Public;
-  #if OCAML_VERSION >= "4.03"
-        otype_immediate = false ;
-    #if OCAML_VERSION >= "4.04"
-        otype_unboxed = false;
-    #endif
-  #endif
-        otype_cstrs   = [] }, Orec_not));
-#else
-  ty = Some (Osig_type (("", [],
-                         (match params with [] -> Otyp_sum []
-                                          | l -> Otyp_tuple l),
-                         Asttypes.Public, []),
-                        Outcometree.Orec_not));
-#endif
+        otype_cstrs   = [];
+        otype_immediate = false;
+        otype_unboxed = false }, Orec_not));
   loc_sig = Lazy.from_val Location.none;
   loc_impl = Lazy.from_val Location.none;
   doc = Lazy.from_val None;
@@ -83,7 +62,6 @@ let mkexn name params doc = {
   orig_path = [];
   kind = Exception;
   name = name;
-#if OCAML_VERSION >= "4.02"
   ty = Some (Osig_typext ({
         oext_name        = name;
         oext_type_name   = "exn";
@@ -91,9 +69,6 @@ let mkexn name params doc = {
         oext_args        = params;
         oext_ret_type    = None;
         oext_private     = Asttypes.Public }, Oext_exception));
-#else
-  ty = Some (Osig_exception (name,params));
-#endif
   loc_sig = Lazy.from_val Location.none;
   loc_impl = Lazy.from_val Location.none;
   doc = Lazy.from_val (Some doc);
@@ -199,7 +174,7 @@ let exceptions = [
   mkexn "Stack_overflow" []
     "Exception raised by the bytecode interpreter when the evaluation stack \
      reaches its maximal size. This often indicates infinite or excessively \
-     deep recursion in the user’s program.";
+     deep recursion in the user's program.";
   mkexn "Sys_error" [constr "string"]
     "Exception raised by the input/output functions to report an operating \
      system error.";

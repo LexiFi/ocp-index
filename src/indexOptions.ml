@@ -37,9 +37,7 @@ let filter opt info =
   let open LibIndex in
   let kinds = opt.filter in
   match info.kind with
-#if OCAML_VERSION >= "4.02"
   | OpenType
-#endif
   | Type -> kinds.t
   | Value | Method _ -> kinds.v
   | Exception -> kinds.e
@@ -87,7 +85,7 @@ let common_opts ?(default_filter = default_filter) () : t Term.t =
       Arg.(value & flag & info ["no-opamlib"] ~doc);
     in
     let arg =
-      let doc = "OCaml directories to (recursively) load the libraries from." in
+      let doc = "OCaml directories to load the libraries from." in
       Arg.(value & opt_all (list string) [] & info ["I"] ~docv:"DIRS" ~doc)
     in
     let set_default no_stdlib no_opamlib includes =
@@ -101,6 +99,10 @@ let common_opts ?(default_filter = default_filter) () : t Term.t =
         try cmd_input_line "ocamlc -where" :: paths with Failure _ -> paths
     in
     Term.(pure set_default $ no_stdlib $ no_opamlib $ arg)
+  in
+  let recursive : bool Term.t =
+    let doc = "Whether to traverse the include directories recursively." in
+    Arg.(value & flag & info ["r"; "recursive"] ~doc)
   in
   let color : bool Term.t =
     let arg =
@@ -248,14 +250,22 @@ let common_opts ?(default_filter = default_filter) () : t Term.t =
     Arg.(value & opt (some filepos_converter) None
          & info ["context"] ~docv:"FILEPOS" ~doc)
   in
-  let lib_info ocamllib (_root,build) (opens,full_opens) context =
+  let lib_info ocamllib recursive (root,build) (opens,full_opens) context =
     let dirs = match build with
       | None -> ocamllib
       | Some d -> d :: ocamllib
     in
+    let dirs = match root with
+    | Some root when Sys.file_exists (Filename.concat root ".ocp-index") ->
+        dirs @ List.map (fun dir -> Filename.concat root dir) (IndexMisc.read_all_lines (Filename.concat root ".ocp-index"))
+    | _ -> dirs
+    in
     if dirs = [] then
       failwith "Failed to guess OCaml / opam lib dirs. Please use `-I'";
-    let dirs = LibIndex.Misc.unique_subdirs dirs in
+    IndexMisc.debug "Scanning directories (rec = %B)... " recursive;
+    let chrono = IndexMisc.timer () in
+    let dirs = if recursive then LibIndex.Misc.unique_subdirs dirs else dirs in
+    IndexMisc.debug "%.3fs\n%!" (chrono ());
     let info = LibIndex.load dirs in
     let info =
       List.fold_left (LibIndex.open_module ~cleanup_path:true) info opens
@@ -284,8 +294,8 @@ let common_opts ?(default_filter = default_filter) () : t Term.t =
   in
   Term.(
     pure
-      (fun ocamllib project_dirs opens color filter context ->
-         { lib_info = lib_info ocamllib project_dirs opens context;
+      (fun ocamllib recursive project_dirs opens color filter context ->
+         { lib_info = lib_info ocamllib recursive project_dirs opens context;
            color; filter; project_root = fst project_dirs })
-    $ ocamllib $ project_dirs $ open_modules $ color $ filter $ context
+    $ ocamllib $ recursive $ project_dirs $ open_modules $ color $ filter $ context
   )
